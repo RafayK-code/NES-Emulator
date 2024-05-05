@@ -54,6 +54,78 @@ namespace nes
         cycles_--;
     }
 
+    void Cpu6502::reset()
+    {
+        reg.a = 0x00;
+        reg.x = 0x00;
+        reg.y = 0x00;
+        reg.sp = 0xFD;
+        reg.status = 0x00 | U;
+
+        addrAbs_ = 0xFFFC;
+        u16 low = read(addrAbs_);
+        u16 high = read(addrAbs_ + 1);
+
+        reg.pc = (high << 8) | low;
+
+        addrRel_ = 0x0000;
+        addrAbs_ = 0x0000;
+        fetched_ = 0x00;
+
+        cycles_ = 8;
+    }
+
+    void Cpu6502::irq()
+    {
+        if (getFlag(I) != 0)
+            return;
+
+        // push current program counter onto stack
+        write(0x0100 + reg.sp, (reg.pc >> 8) & 0x00FF);
+        reg.sp--;
+        write(0x0100 + reg.sp, reg.pc & 0x00FF);
+        reg.sp--;
+
+        // push the status register onto the stack
+        setFlag(B, 0);
+        setFlag(U, 1);
+        setFlag(I, 1);
+        write(0x0100 + reg.sp, reg.status);
+        reg.sp--;
+
+        addrAbs_ = 0xFFFE;
+        u16 low = read(addrAbs_);
+        u16 high = read(addrAbs_ + 1);
+
+        reg.pc = (high << 8) | low;
+
+        cycles_ = 7;
+    }
+
+    void Cpu6502::nmi()
+    {
+        // push current program counter onto stack
+        write(0x0100 + reg.sp, (reg.pc >> 8) & 0x00FF);
+        reg.sp--;
+        write(0x0100 + reg.sp, reg.pc & 0x00FF);
+        reg.sp--;
+
+        // push the status register onto the stack
+        setFlag(B, 0);
+        setFlag(U, 1);
+        setFlag(I, 1);
+        write(0x0100 + reg.sp, reg.status);
+        reg.sp--;
+
+        addrAbs_ = 0xFFFA;
+        u16 low = read(addrAbs_);
+        u16 high = read(addrAbs_ + 1);
+
+        reg.pc = (high << 8) | low;
+
+        cycles_ = 8;
+    }
+
     u8 Cpu6502::IMP()
     {
         fetched_ = reg.a;
