@@ -1,0 +1,3 @@
+[submodule "external/SMFL"]
+	path = external/SMFL
+	url = https://github.com/SFML/SFML.git
