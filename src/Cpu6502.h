@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include "Util.h"
 
@@ -33,6 +34,9 @@ namespace nes
         void reset();
         void irq();
         void nmi();
+
+        bool complete();
+        std::map<u16, std::string> disassemble(u16 nStart, u16 nStop);
 
         enum FLAGS6502
         {

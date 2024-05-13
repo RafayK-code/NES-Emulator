@@ -40,6 +40,7 @@ namespace nes
         }
 
         opcode_ = read(reg.pc);
+        setFlag(U, 1);
         reg.pc++;
 
         cycles_ = lookup_[opcode_].cycles;
@@ -50,6 +51,7 @@ namespace nes
 
         // determine if extra clock cycles are needed
         cycles_ += (addCycle1 & addCycle2);
+        setFlag(U, 1);
 
         cycles_--;
     }
@@ -126,6 +128,126 @@ namespace nes
         cycles_ = 8;
     }
 
+    bool Cpu6502::complete()
+    {
+        return cycles_ == 0;
+    }
+
+    std::map<u16, std::string> Cpu6502::disassemble(u16 nStart, u16 nStop)
+    {
+        u32 addr = (u32)(nStart);
+        u16 lineAddr = 0;
+        u8 value = 0x00, low = 0x00, high = 0x00;
+        std::map<u16, std::string> mapLines;
+
+        while (addr <= (u32)(nStop))
+        {
+            lineAddr = (u16)(addr);
+
+            std::string sInst = "$" + hex(addr, 4) + ": ";
+            u8 opcode = bus_->read(addr, true);
+            addr++;
+            sInst += lookup_[opcode].name + " ";
+
+            if (lookup_[opcode].addrmode == &Cpu6502::IMP)
+                sInst += " {IMP}";
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::IMM)
+            {
+                value = bus_->read(addr, true);
+                addr++;
+                sInst += "#$" + hex(value, 2) + " {IMM}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ZP0)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = 0x00;
+                sInst += "$" + hex(low, 2) + " {ZP0}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ZPX)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = 0x00;
+                sInst += "$" + hex(low, 2) + ", X {ZPX}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ZPY)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = 0x00;
+                sInst += "$" + hex(low, 2) + ", Y {ZPY}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::IZX)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = 0x00;
+                sInst += "($" + hex(low, 2) + ", X) {IZX}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::IZY)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = 0x00;
+                sInst += "($" + hex(low, 2) + ", Y) {IZY}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ABS)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = bus_->read(addr, true);
+                addr++;
+                sInst += "$" + hex((u16)(high) << 8 | low, 4) + " {ABS}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ABX)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = bus_->read(addr, true);
+                addr++;
+                sInst += "$" + hex((u16)(high) << 8 | low, 4) + ", X {ABX}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::ABY)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = bus_->read(addr, true);
+                addr++;
+                sInst += "$" + hex((u16)(high) << 8 | low, 4) + ", Y {ABY}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::IND)
+            {
+                low = bus_->read(addr, true);
+                addr++;
+                high = bus_->read(addr, true);
+                addr++;
+                sInst += "($" + hex((u16)(high) << 8 | low, 4) + ") {IND}";
+            }
+
+            else if (lookup_[opcode].addrmode == &Cpu6502::REL)
+            {
+                value = bus_->read(addr, true);
+                addr++;
+                sInst += "$" + hex(value, 2) + " [$" + hex(addr + value, 4) + "] {REL}";
+            }
+
+            mapLines[lineAddr] = sInst;
+        }
+
+        return mapLines;
+    }
+
     u8 Cpu6502::IMP()
     {
         fetched_ = reg.a;
@@ -181,7 +303,7 @@ namespace nes
         u16 high = (u16)(read(reg.pc));
         reg.pc++;
 
-        addrRel_ = (high << 8) | low;
+        addrAbs_ = (high << 8) | low;
 
         return 0;
     }
@@ -938,7 +1060,7 @@ namespace nes
 
     u8 Cpu6502::read(u16 a) const
     {
-        bus_->read(a);
+        return bus_->read(a);
     }
 
     void Cpu6502::write(u16 a, u8 d) const
@@ -948,7 +1070,7 @@ namespace nes
 
     u8 Cpu6502::getFlag(FLAGS6502 f) const 
     {
-        return (reg.status & f > 0) ? 1 : 0;
+        return ((reg.status & f) > 0) ? 1 : 0;
     }
 
     void Cpu6502::setFlag(FLAGS6502 f, bool v)

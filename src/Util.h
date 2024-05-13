@@ -3,6 +3,7 @@
 #define _UTIL_H
 
 #include <stdint.h>
+#include <string>
 
 namespace nes
 {
@@ -15,6 +16,8 @@ namespace nes
     using i16 = int16_t;
     using i32 = int32_t;
     using i64 = int64_t;
+
+    std::string hex(u32 n, u8 d);
 }
 
 #endif
